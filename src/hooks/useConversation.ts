@@ -49,6 +49,13 @@ export function useConversation() {
     setSelectedIds(new Set());
   }, []);
 
+  const reset = useCallback(() => {
+    setStatus("idle");
+    setConversation(null);
+    setSelectedIds(new Set());
+    setError(null);
+  }, []);
+
   return {
     status,
     conversation,
@@ -58,5 +65,6 @@ export function useConversation() {
     toggleMessage,
     selectAll,
     deselectAll,
+    reset,
   };
 }

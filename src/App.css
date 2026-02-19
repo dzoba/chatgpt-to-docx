@@ -28,6 +28,16 @@
   color: var(--ink);
 }
 
+.home-link {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.home-link:hover {
+  color: var(--accent);
+}
+
 .app-header .subtitle {
   font-size: 1.02rem;
   color: var(--ink-muted);
