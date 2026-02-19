@@ -12,51 +12,98 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Test parsing endpoint
-        id: test
+      - name: Fetch conversation from live endpoint
+        id: fetch
         run: |
-          RESPONSE=$(curl -s -w "\n%{http_code}" \
-            -X POST \
+          curl -sf -X POST \
             -H "Content-Type: application/json" \
             -d '{"url":"https://chatgpt.com/share/699725dc-035c-8009-9716-668eb26c7447"}' \
-            "https://chatgpt-to-docx.web.app/api/fetchConversation")
+            "https://chatgpt-to-docx.web.app/api/fetchConversation" \
+            -o /tmp/canary-response.json
 
-          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+          echo "Fetched response ($(wc -c < /tmp/canary-response.json) bytes)"
 
-          echo "HTTP status: $HTTP_CODE"
+      - name: Validate response content
+        id: validate
+        run: |
+          ERRORS=""
 
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "error=HTTP $HTTP_CODE" >> "$GITHUB_OUTPUT"
-            echo "failed=true" >> "$GITHUB_OUTPUT"
-            echo "::error::Cloud Function returned HTTP $HTTP_CODE"
-            echo "Response body: $BODY"
-            exit 0  # Don't fail yet, let the issue creation step run
+          # 1. Title must match exactly
+          TITLE=$(jq -r '.conversation.title' /tmp/canary-response.json)
+          if [ "$TITLE" != "Convert Chat to PDF/DOCX" ]; then
+            ERRORS="${ERRORS}Title mismatch: expected 'Convert Chat to PDF/DOCX', got '${TITLE}'\n"
           fi
 
-          # Check that we got a valid conversation with messages
-          TITLE=$(echo "$BODY" | jq -r '.conversation.title // empty')
-          MSG_COUNT=$(echo "$BODY" | jq '.conversation.messages | length // 0')
-
-          echo "Title: $TITLE"
-          echo "Message count: $MSG_COUNT"
-
-          if [ -z "$TITLE" ] || [ "$MSG_COUNT" -lt 1 ]; then
-            echo "error=Parsed $MSG_COUNT messages (expected >0), title: '$TITLE'" >> "$GITHUB_OUTPUT"
-            echo "failed=true" >> "$GITHUB_OUTPUT"
-            echo "::error::Parsing returned insufficient data"
-            exit 0
+          # 2. Must have at least 9 messages (the known conversation has 9)
+          MSG_COUNT=$(jq '.conversation.messages | length' /tmp/canary-response.json)
+          if [ "$MSG_COUNT" -lt 9 ]; then
+            ERRORS="${ERRORS}Message count: expected >=9, got ${MSG_COUNT}\n"
           fi
 
-          echo "failed=false" >> "$GITHUB_OUTPUT"
-          echo "Canary passed: '$TITLE' with $MSG_COUNT messages"
+          # 3. Roles must alternate starting with user (after system messages are filtered)
+          FIRST_ROLE=$(jq -r '.conversation.messages[0].role' /tmp/canary-response.json)
+          if [ "$FIRST_ROLE" != "user" ]; then
+            ERRORS="${ERRORS}First message role: expected 'user', got '${FIRST_ROLE}'\n"
+          fi
+
+          # 4. First user message must contain expected content
+          FIRST_MSG=$(jq -r '.conversation.messages[0].content' /tmp/canary-response.json)
+          if ! echo "$FIRST_MSG" | grep -qi "convert chat into"; then
+            ERRORS="${ERRORS}First message content missing expected text 'convert chat into'\n"
+          fi
+
+          # 5. An assistant message must contain markdown formatting (## heading)
+          HAS_MARKDOWN=$(jq -r '[.conversation.messages[] | select(.role == "assistant") | .content] | join("\n")' /tmp/canary-response.json | grep -c "^##" || true)
+          if [ "$HAS_MARKDOWN" -lt 1 ]; then
+            ERRORS="${ERRORS}No markdown headings found in assistant messages\n"
+          fi
+
+          # 6. No junk content should remain (citation markers, sandbox refs)
+          ALL_CONTENT=$(jq -r '[.conversation.messages[].content] | join("\n")' /tmp/canary-response.json)
+          if echo "$ALL_CONTENT" | grep -qP '[\x{e200}-\x{e2ff}]'; then
+            ERRORS="${ERRORS}Junk content: private-use Unicode citation markers found\n"
+          fi
+          if echo "$ALL_CONTENT" | grep -q 'sandbox:/mnt/data'; then
+            ERRORS="${ERRORS}Junk content: sandbox file references found\n"
+          fi
+          if echo "$ALL_CONTENT" | grep -q 'sediment://file_'; then
+            ERRORS="${ERRORS}Junk content: sediment file references found\n"
+          fi
+
+          # 7. No empty messages
+          EMPTY_COUNT=$(jq '[.conversation.messages[] | select(.content == "" or .content == null)] | length' /tmp/canary-response.json)
+          if [ "$EMPTY_COUNT" -gt 0 ]; then
+            ERRORS="${ERRORS}Found ${EMPTY_COUNT} empty messages\n"
+          fi
+
+          # 8. Last message should be from assistant (the conversation ends with an assistant reply)
+          LAST_ROLE=$(jq -r '.conversation.messages[-1].role' /tmp/canary-response.json)
+          if [ "$LAST_ROLE" != "assistant" ]; then
+            ERRORS="${ERRORS}Last message role: expected 'assistant', got '${LAST_ROLE}'\n"
+          fi
+
+          # 9. "Original custom instructions" should be filtered out
+          if echo "$ALL_CONTENT" | grep -qi "Original custom instructions no longer available"; then
+            ERRORS="${ERRORS}Hidden system message 'Original custom instructions' was not filtered\n"
+          fi
+
+          # Report results
+          if [ -n "$ERRORS" ]; then
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+            printf "error<<EOF\n${ERRORS}EOF\n" >> "$GITHUB_OUTPUT"
+            printf "::error::Canary content validation failed:\n${ERRORS}"
+          else
+            echo "failed=false" >> "$GITHUB_OUTPUT"
+            echo "All content checks passed: title='${TITLE}', messages=${MSG_COUNT}"
+          fi
 
       - name: Create issue on failure
-        if: steps.test.outputs.failed == 'true'
+        if: steps.validate.outputs.failed == 'true' || failure()
         uses: actions/github-script@v7
         with:
           script: |
-            const error = '${{ steps.test.outputs.error }}';
+            const error = `${{ steps.validate.outputs.error }}`;
             const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -64,13 +111,32 @@ jobs:
               state: 'open',
             });
 
+            const body = [
+              'The daily canary test detected that the ChatGPT conversation parser is returning bad results.',
+              '',
+              '**Failures:**',
+              '```',
+              error.trim(),
+              '```',
+              '',
+              '**Test URL:** `https://chatgpt.com/share/699725dc-035c-8009-9716-668eb26c7447`',
+              '',
+              'ChatGPT likely changed their share page structure. The parsing strategies in',
+              '`functions/src/fetchConversation.ts` need to be updated.',
+              '',
+              'To debug locally:',
+              '```bash',
+              'curl -s -A "Googlebot" "https://chatgpt.com/share/699725dc-035c-8009-9716-668eb26c7447" -o /tmp/debug.html',
+              '```',
+              'Then inspect the HTML for the new data format.',
+            ].join('\n');
+
             if (issues.length > 0) {
-              // Add a comment to the existing issue instead of creating a duplicate
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issues[0].number,
-                body: `Canary still failing as of ${new Date().toISOString()}:\n\n\`${error}\``,
+                body: `Still failing as of ${new Date().toISOString()}:\n\n\`\`\`\n${error.trim()}\n\`\`\``,
               });
               console.log(`Commented on existing issue #${issues[0].number}`);
             } else {
@@ -78,25 +144,12 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 title: 'Canary: ChatGPT parsing is broken',
-                body: [
-                  'The daily canary test detected that the ChatGPT conversation parser is no longer working.',
-                  '',
-                  `**Error:** \`${error}\``,
-                  '',
-                  'ChatGPT likely changed their share page structure. The parsing strategies in',
-                  '`functions/src/fetchConversation.ts` need to be updated.',
-                  '',
-                  'To debug:',
-                  '```bash',
-                  'curl -s -A "Googlebot" "https://chatgpt.com/share/699725dc-035c-8009-9716-668eb26c7447" -o /tmp/debug.html',
-                  '```',
-                  'Then inspect the HTML for the new data format.',
-                ].join('\n'),
+                body,
                 labels: ['canary-failure'],
               });
               console.log('Created new canary failure issue');
             }
 
-      - name: Fail workflow if canary failed
-        if: steps.test.outputs.failed == 'true'
+      - name: Fail workflow if validation failed
+        if: steps.validate.outputs.failed == 'true'
         run: exit 1
