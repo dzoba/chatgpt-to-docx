@@ -1,0 +1,102 @@
+name: Canary Test
+
+on:
+  schedule:
+    # Run daily at 8am UTC
+    - cron: '0 8 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test parsing endpoint
+        id: test
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"url":"https://chatgpt.com/share/699725dc-035c-8009-9716-668eb26c7447"}' \
+            "https://chatgpt-to-docx.web.app/api/fetchConversation")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "HTTP status: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "error=HTTP $HTTP_CODE" >> "$GITHUB_OUTPUT"
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+            echo "::error::Cloud Function returned HTTP $HTTP_CODE"
+            echo "Response body: $BODY"
+            exit 0  # Don't fail yet, let the issue creation step run
+          fi
+
+          # Check that we got a valid conversation with messages
+          TITLE=$(echo "$BODY" | jq -r '.conversation.title // empty')
+          MSG_COUNT=$(echo "$BODY" | jq '.conversation.messages | length // 0')
+
+          echo "Title: $TITLE"
+          echo "Message count: $MSG_COUNT"
+
+          if [ -z "$TITLE" ] || [ "$MSG_COUNT" -lt 1 ]; then
+            echo "error=Parsed $MSG_COUNT messages (expected >0), title: '$TITLE'" >> "$GITHUB_OUTPUT"
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+            echo "::error::Parsing returned insufficient data"
+            exit 0
+          fi
+
+          echo "failed=false" >> "$GITHUB_OUTPUT"
+          echo "Canary passed: '$TITLE' with $MSG_COUNT messages"
+
+      - name: Create issue on failure
+        if: steps.test.outputs.failed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const error = '${{ steps.test.outputs.error }}';
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'canary-failure',
+              state: 'open',
+            });
+
+            if (issues.length > 0) {
+              // Add a comment to the existing issue instead of creating a duplicate
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues[0].number,
+                body: `Canary still failing as of ${new Date().toISOString()}:\n\n\`${error}\``,
+              });
+              console.log(`Commented on existing issue #${issues[0].number}`);
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: 'Canary: ChatGPT parsing is broken',
+                body: [
+                  'The daily canary test detected that the ChatGPT conversation parser is no longer working.',
+                  '',
+                  `**Error:** \`${error}\``,
+                  '',
+                  'ChatGPT likely changed their share page structure. The parsing strategies in',
+                  '`functions/src/fetchConversation.ts` need to be updated.',
+                  '',
+                  'To debug:',
+                  '```bash',
+                  'curl -s -A "Googlebot" "https://chatgpt.com/share/699725dc-035c-8009-9716-668eb26c7447" -o /tmp/debug.html',
+                  '```',
+                  'Then inspect the HTML for the new data format.',
+                ].join('\n'),
+                labels: ['canary-failure'],
+              });
+              console.log('Created new canary failure issue');
+            }
+
+      - name: Fail workflow if canary failed
+        if: steps.test.outputs.failed == 'true'
+        run: exit 1

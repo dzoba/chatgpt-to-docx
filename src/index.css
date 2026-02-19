@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap');
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:root {
+  --ink: #1a1f36;
+  --ink-light: #4a5068;
+  --ink-muted: #8890a4;
+  --parchment: #faf8f4;
+  --parchment-deep: #f3efe8;
+  --parchment-darker: #e8e2d8;
+  --accent: #b87333;
+  --accent-hover: #9a5f28;
+  --accent-glow: rgba(184, 115, 51, 0.15);
+  --user-bg: #eef2f9;
+  --user-border: #c7d4ea;
+  --user-color: #2c4a7c;
+  --assistant-bg: #eef5f0;
+  --assistant-border: #c2dbc8;
+  --assistant-color: #2d5a3a;
+  --error-bg: #fdf0ef;
+  --error-border: #e8c4c0;
+  --error-color: #8b3a30;
+  --radius: 6px;
+  --shadow-sm: 0 1px 3px rgba(26, 31, 54, 0.06);
+  --shadow-md: 0 4px 16px rgba(26, 31, 54, 0.08);
+  --shadow-lg: 0 8px 32px rgba(26, 31, 54, 0.1);
+  --font-serif: 'DM Serif Display', Georgia, 'Times New Roman', serif;
+  --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  background: var(--parchment);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Subtle paper grain overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.3;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  z-index: 9999;
+}

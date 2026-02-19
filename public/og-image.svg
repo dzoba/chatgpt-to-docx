@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0%" stop-color="#faf8f4"/>
+      <stop offset="100%" stop-color="#f0ebe3"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#b87333"/>
+      <stop offset="100%" stop-color="#8b5a2b"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <!-- Decorative rule -->
+  <rect x="100" y="310" width="1000" height="1" fill="#d4c9b8"/>
+  <rect x="450" y="308" width="300" height="5" rx="2" fill="url(#accent)" opacity="0.6"/>
+  <!-- Title -->
+  <text x="600" y="260" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="72" fill="#1a1f36" font-weight="400">ChatGPT to Word</text>
+  <!-- Subtitle -->
+  <text x="600" y="380" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="28" fill="#8890a4">Convert shared conversations into formatted .docx and .pdf documents</text>
+  <!-- Document icon (left) -->
+  <g transform="translate(180, 440) scale(1.8)">
+    <rect x="0" y="0" width="32" height="42" rx="2" fill="#fff" stroke="#d4c9b8" stroke-width="1.2"/>
+    <rect x="6" y="8" width="14" height="2" rx="1" fill="url(#accent)"/>
+    <rect x="6" y="14" width="20" height="1.5" rx="0.75" fill="#d4c9b8"/>
+    <rect x="6" y="19" width="16" height="1.5" rx="0.75" fill="#d4c9b8"/>
+    <rect x="6" y="24" width="20" height="1.5" rx="0.75" fill="#d4c9b8"/>
+    <rect x="6" y="29" width="12" height="1.5" rx="0.75" fill="#d4c9b8"/>
+  </g>
+  <!-- Arrow icon -->
+  <g transform="translate(570, 460)">
+    <circle cx="30" cy="25" r="24" fill="url(#accent)" opacity="0.15"/>
+    <path d="M30 12 L30 36 M20 28 L30 38 L40 28" stroke="#b87333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+  <!-- PDF/DOCX labels -->
+  <g transform="translate(920, 455)">
+    <rect x="0" y="0" width="65" height="28" rx="4" fill="url(#accent)"/>
+    <text x="32.5" y="19" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="13" fill="#fff" font-weight="600">.docx</text>
+    <rect x="75" y="0" width="50" height="28" rx="4" fill="#1a1f36"/>
+    <text x="100" y="19" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="13" fill="#faf8f4" font-weight="600">.pdf</text>
+  </g>
+  <!-- URL bar -->
+  <text x="600" y="560" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="20" fill="#b87333">chatgpt-to-docx.web.app</text>
+</svg>

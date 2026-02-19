@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "chatgpt-to-docx"
+  },
+  "targets": {
+    "chatgpt-to-docx": {
+      "hosting": {
+        "default": [
+          "chatgpt-to-docx"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#b87333"/>
+      <stop offset="100%" stop-color="#8b5a2b"/>
+    </linearGradient>
+  </defs>
+  <!-- Document page -->
+  <rect x="10" y="4" width="38" height="50" rx="3" fill="#faf8f4" stroke="#d4c9b8" stroke-width="1.5"/>
+  <!-- Dog-ear fold -->
+  <path d="M36 4 L48 4 L48 16 Z" fill="#ebe5da"/>
+  <path d="M36 4 L36 16 L48 16" fill="none" stroke="#d4c9b8" stroke-width="1.5" stroke-linejoin="round"/>
+  <!-- Text lines -->
+  <rect x="16" y="14" width="16" height="2.5" rx="1" fill="url(#g)"/>
+  <rect x="16" y="21" width="26" height="2" rx="1" fill="#c4baa8"/>
+  <rect x="16" y="26" width="22" height="2" rx="1" fill="#c4baa8"/>
+  <rect x="16" y="31" width="26" height="2" rx="1" fill="#c4baa8"/>
+  <rect x="16" y="36" width="18" height="2" rx="1" fill="#c4baa8"/>
+  <rect x="16" y="43" width="24" height="2" rx="1" fill="#c4baa8"/>
+  <rect x="16" y="48" width="20" height="2" rx="1" fill="#c4baa8"/>
+  <!-- Arrow overlay (download) -->
+  <circle cx="46" cy="46" r="14" fill="url(#g)"/>
+  <path d="M46 38 L46 50 M40 46 L46 52 L52 46" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
